@@ -1,11 +1,11 @@
 {
-"name": "miiverse",
-"version": "1.0.0",
-"private": true,
-"scripts": {
-"start": "npx serve ."
-},
-"dependencies": {
-"serve": "^14.2.4"
-}
+  "name": "miiverse",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
 }
