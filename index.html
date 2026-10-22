@@ -121,6 +121,40 @@ canvas{display:block;width:100%;height:auto;border:2px solid #e2e2e2;border-radi
 #call{position:fixed;inset:0;z-index:35;background:rgba(0,0,0,.88);color:#fff;display:grid;place-items:center;text-align:center;padding:16px}
 #call video{max-width:100%;max-height:60vh;border-radius:8px;background:#000}
 .tc{overflow:hidden;margin-bottom:14px}.tc>img{width:100%;max-height:220px;object-fit:cover;display:block}.tc .bd{padding:12px}
+html,body{overflow-x:clip}
+img,video,canvas{max-width:100%}
+.bar .avbox svg{width:100%;height:100%}
+.nv{display:flex;align-items:center;gap:2px}
+.mw{display:flex}
+.row,.acts{flex-wrap:wrap}
+.info{flex-wrap:wrap}.info .tx{flex:1 1 150px}
+.nt{flex-wrap:wrap}.nt .tx{flex:1 1 160px}
+.foot{overflow-wrap:anywhere}
+@media (max-width:900px){.bar .lbl{display:none}}
+@media (max-width:700px){
+  .bar{padding:6px 10px;gap:6px}
+  .bar .logo{font-size:1.45rem}
+  .bar .pill{padding:2px 12px;font-size:.9rem}
+  .nv{flex:1 0 100%;order:3;justify-content:space-between;gap:0;border-top:1px solid #eee;margin-top:2px;padding-top:2px}
+  .nv>button,.nv>.mw{flex:1 1 0}
+  .nv>button{justify-content:center;padding:4px 0}
+  .mw>button{flex:1;justify-content:center;padding:4px 0}
+  .bar button svg{width:26px;height:26px}
+}
+@media (max-width:600px){
+  .page{padding:12px 8px 24px;gap:14px}
+  .btn{padding:7px 14px;font-size:.9rem}.ghost{padding:5px 12px;font-size:.9rem}
+  .tile{width:56px;height:56px;font-size:1.5rem}
+  .say .avbox{width:44px;height:44px}.bub{padding:8px 10px;font-size:.9rem}
+  .avbox.lg{width:52px;height:52px}
+  .prof .acts{flex:1 0 100%}.prof .acts>*{flex:1 1 calc(50% - 8px);text-align:center}
+  .md{padding:14px}
+  form.card>.btn{width:100%}
+  .fl{flex-direction:row;overflow-x:auto;padding-bottom:4px}.fl .chip{flex:none}
+  .ml{height:45vh;min-height:240px}
+  .sf .ghost{padding:5px 9px}.sf .btn{padding:7px 12px}
+  .dw{gap:8px}.dw>.avbox,.cm>.avbox,.nt>.avbox{width:34px;height:34px}
+}
 </style>
 </head>
 <body>
@@ -190,7 +224,7 @@ var tt;function toast(m){var t=$("toast");t.textContent=m;t.hidden=false;clearTi
 
 /* ---------- helpers ---------- */
 function ts(){return firebase.firestore.FieldValue.serverTimestamp()}
-var rt;function rq(){clearTimeout(rt);rt=setTimeout(render,40)}
+var rt,fs=0;function rq(){clearTimeout(rt);rt=setTimeout(function(){fs=1;render();fs=0},40)}
 function ms(t){return t&&t.toMillis?t.toMillis():Date.now()}
 function un(uid,f){var u=users[uid];if(u&&u.off&&!(user&&user.uid===uid))return "Account Forgotten";return esc((u&&u.name)||(user&&user.uid===uid&&user.displayName)||f||"Player")}
 function yn(pid){return yeahs.filter(function(y){return y.pid===pid}).length}
@@ -236,6 +270,9 @@ function hdr(){
     +'<div class="mw"><button data-a="menu" aria-label="Menu" aria-expanded="'+menuOpen+'">'+IMENU+'</button>'
     +(menuOpen?'<div class="dd">'+(u?'<button data-a="addcom">Add community</button><button data-a="settings">Settings</button>'+(isAdm()?'<button data-a="adm">Ban panel</button>':"")+'<button data-a="logout">Log out</button>':'<button data-a="signup">Sign up</button><button data-a="login">Log in</button>')+'</div>':'')+'</div></div>';
   $("hd").innerHTML=h;
+  var br=$("hd").firstChild,nv=document.createElement("div");nv.className="nv";
+  Array.prototype.slice.call(br.children).forEach(function(c){if(!c.classList.contains("logo")&&(c.classList.contains("mw")||["feed","home","tour","msgs","notes"].indexOf(c.dataset.a)>=0))nv.appendChild(c)});
+  br.appendChild(nv);
 }
 
 /* ---------- pieces ---------- */
@@ -312,10 +349,17 @@ function banH(b){
   return '<main class="one"><div class="card prof" style="display:block;padding:20px"><h2 class="nm">You’re banned</h2><p>Your ban ends on '+fdt(b.until)+'.</p>'+(b.msg?'<p class="sub">'+who+': '+esc(b.msg)+'</p>':"")+'</div><h2>Appeal your ban</h2>'
    +'<form id="apf" class="card" style="padding:14px"><label>Email<input id="ape" type="email" required></label><label>First name<input id="apn" required maxlength="40"></label><label>Last name<input id="apl" required maxlength="40"></label><label>Ban you got<input id="apb" readonly value="'+esc(b.label||"Ban")+'"></label><label>Message<textarea id="apm" required maxlength="500" placeholder="Tell us why this ban should be lifted…"></textarea></label><div class="err" id="apr" role="alert"></div><div class="row"><button type="button" class="ghost" data-a="logout">Log out</button><button class="btn">Send appeal</button></div></form></main>';
 }
-function findU(n){n=n.trim().toLowerCase();return Object.keys(users).find(function(u){return (users[u].ul||(users[u].name||"").toLowerCase())===n})}
+function findU(n){
+  n=n.trim().toLowerCase().replace(/^@/,"");if(!n)return null;
+  var k=Object.keys(users),m=function(x){return x&&String(x).trim().toLowerCase()===n},i;
+  for(i=0;i<k.length;i++)if(m(users[k[i]].ul)||m(users[k[i]].uname))return k[i];
+  for(i=0;i<k.length;i++)if(m(users[k[i]].name))return k[i];
+  var f=null;[posts,cmts,tours,coms].some(function(l){return l.some(function(x){if(m(x.name)||m(x.owner)){f=x.uid;return true}})});
+  return f;
+}
 function admH(){
   if(!isAdm())return '<main class="one"><div class="none card">Only MediaVerse can open this page.</div></main>';
-  return '<main class="one"><h2>Ban panel</h2><form id="bf" class="card" style="padding:14px"><label>Username<input id="bu" required maxlength="20" placeholder="Their username"></label><label>Ban length<select id="bl">'+DUR.map(function(d,i){return '<option value="'+i+'">'+d[0]+'</option>'}).join("")+'<option value="t">Terminate account</option></select></label><label>Message for the user<input id="bm" maxlength="200" placeholder="Shown on their ban screen"></label><div class="err" id="ber" role="alert"></div><div class="row"><button type="button" class="ghost" data-a="lift">Lift ban</button><button class="btn">Apply</button></div></form></main>';
+  return '<main class="one"><h2>Ban panel</h2><form id="bf" class="card" style="padding:14px"><label>Username<input id="bu" required maxlength="20" list="bul" autocomplete="off" placeholder="Their username"></label><datalist id="bul">'+Object.keys(users).map(function(u){return '<option value="'+esc(users[u].uname||users[u].name||"")+'">'}).join("")+'</datalist><label>Ban length<select id="bl">'+DUR.map(function(d,i){return '<option value="'+i+'">'+d[0]+'</option>'}).join("")+'<option value="t">Terminate account</option></select></label><label>Message for the user<input id="bm" maxlength="200" placeholder="Shown on their ban screen"></label><div class="err" id="ber" role="alert"></div><div class="row"><button type="button" class="ghost" data-a="lift">Lift ban</button><button class="btn">Apply</button></div></form></main>';
 }
 
 /* friends */
@@ -437,8 +481,9 @@ function setH(){
 
 /* ---------- views ---------- */
 function render(){
-  var v=view,h="",ae=document.activeElement,kid=ae&&(ae.id==="mt"||ae.id==="q"||ae.id==="st")?ae.id:"",kv=kid?ae.value:"",bn=user&&activeBan();
+  var v=view,h="",ae=document.activeElement,kid=ae&&(ae.id==="mt"||ae.id==="q"||ae.id==="st"||ae.id==="bu")?ae.id:"",kv=kid?ae.value:"",bn=user&&activeBan();
   if(bn){var bk=bn.kind+(bn.until?bn.until.toMillis():"")+(bn.msg||""),ap=$("app");closeModal();endCall(false);$("hd").innerHTML='<div class="bar"><div class="logo">'+LOGO+'Mediaverse</div></div>';if(ap.dataset.ban!==bk){ap.dataset.ban=bk;ap.innerHTML=banH(bn)}return}
+  if(fs&&(v.t==="adm"||v.t==="set")&&ae&&ae.closest&&ae.closest("form")){hdr();return}
   $("app").removeAttribute("data-ban");
   if(v.t==="m"){h=msgH()}else if(v.t==="tl"){h=tlH()}else if(v.t==="t"){h=tdH()}else if(v.t==="set"){h=setH()}else if(v.t==="adm"){h=admH()}else if(v.t==="home"){
     var c=coms[0],dr=posts.filter(function(p){return okImg(p.draw)}).slice(0,5);
@@ -598,7 +643,7 @@ document.addEventListener("click",function(e){
   else if(a==="delt"){if(confirm("Delete this tournament?"))db.collection("tournaments").doc(id).delete().then(function(){go({t:"tl"})}).catch(function(x){toast(x.message)})}
   else if(a==="settings")need("open settings",function(){go({t:"set"})});
   else if(a==="adm")go({t:"adm"});
-  else if(a==="lift"){var lu=findU($("bu").value);if(!lu)$("ber").textContent="No user with that username.";else db.collection("bans").doc(lu).delete().then(function(){$("ber").style.color="#3a9000";$("ber").textContent="Ban lifted for "+un(lu)+"."}).catch(function(x){$("ber").textContent=x.message})}
+  else if(a==="lift"){var lu=findU($("bu").value);if(!lu)$("ber").textContent="No user found with that username. They may need to log in once first.";else db.collection("bans").doc(lu).delete().then(function(){$("ber").style.color="#3a9000";$("ber").textContent="Ban lifted for "+un(lu)+"."}).catch(function(x){$("ber").textContent=x.message})}
   else if(a==="deact"){if(confirm("Deactivate your account? Nobody will be able to find it until you reactivate."))db.collection("users").doc(user.uid).set({off:true},{merge:true}).then(function(){toast("Account deactivated.")}).catch(function(x){toast(x.message)})}
   else if(a==="react")db.collection("users").doc(user.uid).set({off:false},{merge:true}).then(function(){toast("Welcome back! Your account is active again.")}).catch(function(x){toast(x.message)});
   else if(a==="close")closeModal();
@@ -636,7 +681,7 @@ document.addEventListener("submit",function(e){
     db.collection("comments").add({pid:view.id,text:tx,uid:user.uid,name:user.displayName||"Player",to:pp?pp.uid:"",created:ts()})
       .then(function(){var m=$("mt");if(m)m.value="";b.disabled=false}).catch(function(x){b.disabled=false;toast(x.message)});
   }else if(id==="bf"){
-    var tu=findU($("bu").value);if(!tu){$("ber").textContent="No user with that username.";return}
+    var tu=findU($("bu").value);if(!tu){$("ber").textContent="No user found with that username. They may need to log in once first.";return}
     var sel=$("bl").value,o={by:"MediaVerse",msg:$("bm").value.trim(),created:ts()};
     if(sel==="t"){o.kind="term";o.label="Terminated"}
     else{var dd=DUR[+sel],dt=new Date();if(dd[2]==="d")dt.setDate(dt.getDate()+dd[1]);else if(dd[2]==="m")dt.setMonth(dt.getMonth()+dd[1]);else dt.setFullYear(dt.getFullYear()+dd[1]);o.kind="temp";o.until=firebase.firestore.Timestamp.fromDate(dt);o.label=dd[0]}
@@ -685,6 +730,13 @@ document.addEventListener("submit",function(e){
   }
 });
 
+var usersLoaded=false,bfDone=0;
+function back(){
+  if(!user||!usersLoaded||bfDone===user.uid)return;bfDone=user.uid;
+  var u=users[user.uid],n=user.displayName;if(!n)return;
+  if(!u)db.collection("users").doc(user.uid).set({name:n,uname:n,ul:n.toLowerCase(),bio:"",photo:"",created:ts()},{merge:true}).catch(function(){});
+  else if(!u.ul)db.collection("users").doc(user.uid).set({uname:n,ul:n.toLowerCase()},{merge:true}).catch(function(){});
+}
 /* ---------- firebase ---------- */
 function mk(d){return Object.assign({id:d.id},d.data())}
 function fe(x){toast("Couldn’t load data: "+x.message)}
@@ -698,7 +750,7 @@ if(fb){
   firebase.initializeApp(FIREBASE_CONFIG);auth=firebase.auth();db=firebase.firestore();
   auth.onAuthStateChanged(function(u){
     user=u;try{seen=u?+localStorage.getItem("mv_seen_"+u.uid)||0:0}catch(x){}
-    if(bu){bu();bu=null}if(cu2){cu2();cu2=null}if(cu){cu();cu=null;cid2=""}
+    if(bu){bu();bu=null}if(cu2){cu2();cu2=null}if(cu){cu();cu=null;cid2=""}bfDone=0;back();
     myBan=null;
     if(u){
       bu=db.collection("bans").doc(u.uid).onSnapshot(function(s){
@@ -725,7 +777,7 @@ if(fb){
   L("friends",1000,function(a){friends=a},1);
   L("tournaments",60,function(a){tours=a},1);
   L("favs",500,function(a){favs=a});
-  L("users",300,function(a){users={};a.forEach(function(u){users[u.id]=u})});
+  L("users",300,function(a){users={};a.forEach(function(u){users[u.id]=u});usersLoaded=true;back()});
   setInterval(chkAcc,30000);document.addEventListener("visibilitychange",function(){if(!document.hidden)chkAcc()});
 }
 render();
