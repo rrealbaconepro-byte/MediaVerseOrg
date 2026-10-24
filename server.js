@@ -28,7 +28,7 @@ app.use((req, res, next) => {
 });
 
 // Serve only the website file (never the folder, so .env can't be downloaded).
-app.get("/", (req, res) => res.sendFile(path.join(here, "miiverse-firebase.html")));
+app.get("/", (req, res) => res.sendFile(path.join(here, "index.html")));
 
 // ---- only logged-in Mediaverse users may chat (checks their Firebase login) ----
 const verified = new Map(); // token -> { uid, until }
