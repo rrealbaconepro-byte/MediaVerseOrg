@@ -2,7 +2,7 @@
   "name": "mediaverse-server",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node --env-file=.env server.js" },
+  "scripts": { "start": "node server.js" },
   "engines": { "node": ">=20.6" },
-  "dependencies": { "express": "^4.21.2", "groq-sdk": "latest" }
+  "dependencies": { "express": "^4.21.2", "groq-sdk": "latest", "firebase-admin": "latest" }
 }
