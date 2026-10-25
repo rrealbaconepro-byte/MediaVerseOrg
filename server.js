@@ -164,7 +164,7 @@ app.use((req, res, next) => {
 
 // Only these files are served (never the whole folder, so secrets can't be downloaded).
 app.get(["/", "/index.html"], (req, res) => res.sendFile(path.join(here, "index.html")));
-app.get("/loading.mp4", (req, res) => res.sendFile(path.join(here, "loading.mp4")));
+app.get("/loading.mp4", (req, res) => res.sendFile(path.join(here, "loading.mp4"), (err) => { if (err && !res.headersSent) res.status(404).end(); }));
 
 app.get("/api/status", (req, res) => res.set("Cache-Control", "no-store").json({ open: siteOpen }));
 app.get("/api/config", (req, res) => {
