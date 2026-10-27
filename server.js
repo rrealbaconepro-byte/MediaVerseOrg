@@ -2,9 +2,11 @@
 // Serves the website and loading video, keeps secrets off the website, runs AI Buddy,
 // Support and AI ban appeals, and holds the owner's "site access" switch.
 import express from "express";
+import { WebSocketServer } from "ws";
 import { Groq } from "groq-sdk";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { initializeApp, cert } from "firebase-admin/app";
@@ -423,4 +425,88 @@ app.post("/api/avatar", async (req, res) => {
   } catch (e) { fail(res, e); }
 });
 
-app.listen(PORT, () => console.log(`Mediaverse is running on port ${PORT}`));
+// Owner only: give (or take) Medicoins.
+app.post("/api/owner/coins", async (req, res) => {
+  if (!siteOpen) return res.status(503).json({ error: "The site is closed right now." });
+  if (!adb) return res.status(503).json({ error: "Medicoins aren’t set up on the server yet." });
+  try {
+    const token = bearer(req);
+    const u = token ? await verify(token) : null;
+    if (!u || u.email !== OWNER_EMAIL) return res.status(403).json({ error: "Owner only." });
+    const uid = String(req.body?.uid || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 40);
+    const amount = Math.trunc(Number(req.body?.amount));
+    if (!uid || !amount || Math.abs(amount) > 1000000) return res.status(400).json({ error: "Pick a user and an amount (up to 1,000,000)." });
+    await adb.doc(`wallets/${uid}`).set({ coins: FieldValue.increment(amount) }, { merge: true });
+    res.json({ ok: true });
+  } catch (e) { fail(res, e); }
+});
+
+// ---------- "Play in browser": a small live room for two friends ----------
+const SEX = /\b(porn\w*|nudes?|blowjobs?|handjobs?|dildos?|pussy|horny|sexting|onlyfans)\b/i;
+const THR = /\b(kill (you|yourself|u)|kys|hope you die|you should die)\b/i;
+function chatFilter(t) {
+  t = String(t || "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 120);
+  if (!t || SEX.test(t) || THR.test(t) || MEAN.test(t)) return null;
+  return t.replace(new RegExp(BAD.source, "gi"), (w) => w[0] + "*".repeat(Math.max(0, w.length - 1)));
+}
+const clamp = (n, a, b) => Math.max(a, Math.min(b, Number.isFinite(n) ? n : a));
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: "/play", maxPayload: 4096 });
+const rooms = new Map(); // room id -> Map(uid -> player)
+wss.on("connection", (ws) => {
+  let me = null, room = null, lastChat = 0;
+  const send = (w, o) => { if (w.readyState === 1) w.send(JSON.stringify(o)); };
+  const cast = (o, except) => { for (const p of (rooms.get(room) || new Map()).values()) if (p.ws !== except) send(p.ws, o); };
+  const pub = (p) => ({ id: p.uid, name: p.name, char: p.char, wear: p.wear, x: p.x, y: p.y });
+  const timer = setTimeout(() => { if (!me) ws.close(); }, 10000);
+  ws.on("message", async (raw) => {
+    try {
+      if (!siteOpen) return ws.close();
+      let m; try { m = JSON.parse(raw); } catch { return; }
+      if (m.t === "join" && !me) {
+        const u = await verify(String(m.token || ""));
+        const rid = String(m.room || "");
+        if (!u || !/^[A-Za-z0-9]+_[A-Za-z0-9]+$/.test(rid) || !rid.split("_").includes(u.uid)) return ws.close();
+        if (adb) {
+          const f = (await adb.doc(`friends/${rid}`).get()).data();
+          if (!f || f.status !== "ok") return ws.close();
+        }
+        const wear = {};
+        for (const slot of SLOTS) {
+          const id = String(m.wear?.[slot] || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 40);
+          if (id) wear[slot] = id;
+        }
+        const r = rooms.get(rid) || new Map();
+        rooms.set(rid, r);
+        r.get(u.uid)?.ws.close();
+        me = u.uid; room = rid;
+        const p = { ws, uid: me, name: String(m.name || "Player").replace(/[\u0000-\u001f]/g, "").slice(0, 20) || "Player", char: FREE_CHARS.includes(m.char) ? m.char : "c1", wear, x: 300 + Math.random() * 120, y: 280 + Math.random() * 60 };
+        r.set(me, p);
+        send(ws, { t: "state", you: me, players: [...r.values()].map(pub) });
+        cast({ t: "join", p: pub(p) }, ws);
+      } else if (me) {
+        const p = rooms.get(room)?.get(me);
+        if (!p || p.ws !== ws) return;
+        if (m.t === "pos") {
+          p.x = clamp(Number(m.x), 20, 700); p.y = clamp(Number(m.y), 120, 410);
+          cast({ t: "pos", id: me, x: p.x, y: p.y }, ws);
+        } else if (m.t === "chat" && Date.now() - lastChat > 900) {
+          lastChat = Date.now();
+          const text = chatFilter(m.text);
+          if (text) cast({ t: "chat", id: me, text });
+        }
+      }
+    } catch (e) { console.error(e); }
+  });
+  ws.on("close", () => {
+    clearTimeout(timer);
+    const r = rooms.get(room);
+    if (me && r?.get(me)?.ws === ws) {
+      r.delete(me);
+      cast({ t: "leave", id: me });
+      if (!r.size) rooms.delete(room);
+    }
+  });
+});
+
+server.listen(PORT, () => console.log(`Mediaverse is running on port ${PORT}`));
