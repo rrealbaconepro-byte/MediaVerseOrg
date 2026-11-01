@@ -12,6 +12,8 @@
     "express": "^4.21.2",
     "groq-sdk": "latest",
     "firebase-admin": "latest",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "firebase": "10.14.1",
+    "three": "0.147.0"
   }
 }
